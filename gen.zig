@@ -1,6 +1,6 @@
 const std = @import("std");
 
-const Dfs = struct {
+pub const Dfs = struct {
     const Self = @This();
 
     buffer: [][]CellState,
@@ -9,7 +9,7 @@ const Dfs = struct {
     stack: std.ArrayList(StackItem),
     rng: std.Random,
 
-    fn init(width: usize, height: usize, alloc: std.mem.Allocator, rng: std.Random) !Self {
+    pub fn init(width: usize, height: usize, alloc: std.mem.Allocator, rng: std.Random) !Self {
         const CSAL = std.ArrayList(CellState);
 
         const true_width = width * 2 - 1;
@@ -43,7 +43,7 @@ const Dfs = struct {
         };
     }
 
-    fn deinit(self: Self) void {
+    pub fn deinit(self: Self) void {
         for (self.buffer) |x| {
             self.alloc.free(x);
         }
@@ -77,16 +77,16 @@ const Dfs = struct {
         return try lst.toOwnedSlice();
     }
 
-    fn get_cell(self: Self, p: Point) CellState {
+    pub fn get_cell(self: Self, p: Point) CellState {
         return self.buffer[p.y][p.x];
     }
 
-    fn set_cell(self: *Self, p: Point, c: CellState) void {
+    pub fn set_cell(self: *Self, p: Point, c: CellState) void {
         self.buffer[p.y][p.x] = c;
     }
 
     /// returns the updates to each cell
-    fn next(self: *Self) !?struct { p: Point, c: CellState } {
+    pub fn next(self: *Self) !?struct { p: Point, c: CellState } {
         const tail = self.stack.getLastOrNull() orelse return null;
         const p = tail.p;
         const last = tail.last;
