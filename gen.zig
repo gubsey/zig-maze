@@ -120,42 +120,48 @@ pub const Dfs = struct {
         return .{ .p = p, .c = .done };
     }
 
-    fn print(self: Self) !void {
+    pub fn print(self: Self) !void {
         const stdout = std.io.getStdOut().writer();
+
+        const wall = "█";
 
         var lines = std.ArrayList([]u8).init(self.alloc);
         defer lines.deinit();
 
+        var hat_len: usize = 0;
+
         for (self.buffer) |row| {
             var line = std.ArrayList(u8).init(self.alloc);
 
+            hat_len = 0;
             for (row, 0..) |cell, x| {
                 const repeat = ((x + 1) & 1) + 1;
                 for (0..repeat) |_| {
                     try line.appendSlice(switch (cell) {
                         .done => " ",
-                        .none => "#",
+                        .none => wall,
                         .explore => "+",
                     });
+                    hat_len += 1;
                 }
             }
 
             try lines.append(try line.toOwnedSlice());
         }
 
-        const line_len = lines.items[0].len;
+        // const line_len = lines.items[0].len;
 
-        for (0..line_len + 2) |_| {
-            try stdout.print("#", .{});
+        for (0..hat_len + 2) |_| {
+            try stdout.print("{s}", .{wall});
         }
         try stdout.print("\n", .{});
 
         for (lines.items) |row| {
-            try stdout.print("#{s}#\n", .{row});
+            try stdout.print("{s}{s}{s}\n", .{ wall, row, wall });
         }
 
-        for (0..line_len + 2) |_| {
-            try stdout.print("#", .{});
+        for (0..hat_len + 2) |_| {
+            try stdout.print("{s}", .{wall});
         }
         try stdout.print("\n", .{});
 
@@ -202,7 +208,7 @@ test "initial possible moves" {
 }
 
 test "print" {
-    var dfs = try Dfs.init(5, 5, std.testing.allocator, test_rng);
+    var dfs = try Dfs.init(8, 6, std.testing.allocator, test_rng);
     defer dfs.deinit();
 
     while (try dfs.next()) |_| {}

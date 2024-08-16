@@ -1,7 +1,7 @@
 const std = @import("std");
 
 pub const Point = struct { x: usize, y: usize };
-pub const Dimensions = struct { w: usize, y: usize };
+pub const Dimensions = struct { w: usize, h: usize };
 
 pub fn xy(x: usize, y: usize) Point {
     return Point{ .x = x, .y = y };
