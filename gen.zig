@@ -1,5 +1,11 @@
 const std = @import("std");
 
+const lib = @import("lib.zig");
+const Point = lib.Point;
+const Dimensions = lib.Dimensions;
+const xy = lib.xy;
+const mid = lib.mid;
+
 pub const Dfs = struct {
     const Self = @This();
 
@@ -52,7 +58,7 @@ pub const Dfs = struct {
         self.stack.deinit();
     }
 
-    fn adjacent_cells(self: Self, p: Point) ![]Point {
+    pub fn adjacent_cells(self: Self, p: Point) ![]Point {
         var lst = try std.ArrayList(Point).initCapacity(self.alloc, 4);
 
         const x = p.x;
@@ -166,21 +172,8 @@ pub const Dfs = struct {
     }
 };
 
-const Dimensions = struct { w: usize, h: usize };
-const Point = struct { x: usize, y: usize };
 const CellState = enum { done, none, explore };
 const StackItem = struct { p: Point, last: Point };
-
-fn xy(x: usize, y: usize) Point {
-    return Point{ .x = x, .y = y };
-}
-
-fn mid(a: Point, b: Point) Point {
-    return .{
-        .x = (a.x + b.x) / 2,
-        .y = (a.y + b.y) / 2,
-    };
-}
 
 // TEST
 

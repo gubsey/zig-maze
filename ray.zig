@@ -26,7 +26,7 @@ pub fn main() !void {
         ray.BeginDrawing();
         defer ray.EndDrawing();
 
-        ray.ClearBackground(ray.BLACK);
+        ray.ClearBackground(ray.GREEN);
 
         var pos = ray.Vector2{ .x = PADDING + SQ_SIZE, .y = PADDING + SQ_SIZE };
 
@@ -43,28 +43,5 @@ pub fn main() !void {
             pos.x = PADDING + SQ_SIZE;
             pos.y += SQ_SIZE;
         }
-
-        ray.DrawRectangle(
-            PADDING,
-            PADDING,
-            SQ_SIZE,
-            SQ_SIZE + mazeH,
-            ray.GREEN,
-        );
-        ray.DrawRectangle(
-            PADDING,
-            PADDING + SQ_SIZE + mazeH,
-            SQ_SIZE + mazeW,
-            SQ_SIZE,
-            ray.GREEN,
-        );
-        ray.DrawRectangle(
-            PADDING + SQ_SIZE + mazeW,
-            PADDING + SQ_SIZE,
-            SQ_SIZE,
-            SQ_SIZE + mazeH,
-            ray.GREEN,
-        );
-        ray.DrawRectangle(PADDING + SQ_SIZE, PADDING, SQ_SIZE + mazeW, SQ_SIZE, ray.GREEN);
     }
 }
