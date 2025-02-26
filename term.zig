@@ -8,6 +8,7 @@ pub fn main() !void {
         return;
     }
 
+    
     const w = try std.fmt.parseInt(u32, std.mem.span(args[1]), 10);
     const h = try std.fmt.parseInt(u32, std.mem.span(args[2]), 10);
 

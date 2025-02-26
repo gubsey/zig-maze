@@ -11,7 +11,7 @@ pub const Dfs = struct {
     alloc: std.mem.Allocator,
     checked: [][]bool,
 
-    /// will use the provieded maze's allocator if none is provided;
+    /// will use the provided maze's allocator if none is provided;
     pub fn init(maze: Maze, alloc_arg: ?std.mem.Allocator) !@This() {
         const alloc = alloc_arg orelse maze.alloc;
 

@@ -13,3 +13,7 @@ pub fn mid(a: Point, b: Point) Point {
         .y = (a.y + b.y) / 2,
     };
 }
+
+pub fn rect(w: usize, h: usize) Dimensions {
+    return .{ .w = w, .h = h };
+}
