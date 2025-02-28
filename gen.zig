@@ -9,6 +9,79 @@ const mid = lib.mid;
 
 const WALL = "█";
 
+pub const Maze = struct {
+    cells: [][]Tile,
+    alloc: std.mem.Allocator,
+
+    pub fn deinit(self: @This()) void {
+        for (self.cells) |r| {
+            self.alloc.free(r);
+        }
+        self.alloc.free(self.cells);
+    }
+
+    /// remember to free the returned string with the maze's allocater
+    pub fn to_ascii(maze: @This()) ![]u8 {
+        var lines = AL([]u8).init(maze.alloc);
+        defer lines.deinit();
+        defer for (lines.items) |row| {
+            maze.alloc.free(row);
+        };
+
+        var hat_len: usize = 0;
+
+        for (maze.cells) |row| {
+            var line = AL(u8).init(maze.alloc);
+
+            hat_len = 0;
+            for (row, 0..) |cell, x| {
+                const repeat = ((x + 1) & 1) + 1;
+                for (0..repeat) |_| {
+                    try line.appendSlice(switch (cell) {
+                        .Hall => " ",
+                        .Wall => WALL,
+                        .Othe => "%",
+                    });
+                    hat_len += 1;
+                }
+            }
+
+            try lines.append(try line.toOwnedSlice());
+        }
+
+        var alb = std.ArrayList(u8).init(maze.alloc);
+        const walb = alb.writer();
+
+        for (0..hat_len + 4) |_| {
+            try walb.print("{s}", .{WALL});
+        }
+        try walb.print("\n", .{});
+
+        for (lines.items) |row| {
+            try walb.print("{s}{s}{s}{s}{s}\n", .{ WALL, WALL, row, WALL, WALL });
+        }
+
+        for (0..hat_len + 4) |_| {
+            try walb.print("{s}", .{WALL});
+        }
+        try walb.print("\n", .{});
+
+        return alb.toOwnedSlice();
+    }
+};
+
+pub const Tile = enum {
+    Wall,
+    Hall,
+    Othe,
+};
+
+pub const Wilson = struct {
+    buffer: [][]CellState,
+    dimensions: Dimensions,
+    stack: Al(Point),
+}
+
 pub const Dfs = struct {
     buffer: [][]CellState,
     alloc: std.mem.Allocator,
@@ -62,6 +135,18 @@ pub const Dfs = struct {
         self.alloc.free(self.buffer);
 
         self.stack.deinit();
+    }
+
+    pub fn gen(
+        width: usize,
+        height: usize,
+        alloc: std.mem.Allocator,
+        rng: std.Random,
+    ) !Maze {
+        var self = try Self.init(width, height, alloc, rng);
+        defer self.deinit();
+        while (try self.next()) |_| {}
+        return try self.to_maze();
     }
 
     pub fn adjacent_cells(self: Self, p: Point) ![]Point {
@@ -180,6 +265,25 @@ pub const Dfs = struct {
             .h = self.buffer.len,
         };
     }
+
+    fn to_maze(self: Self) !Maze {
+        var cellList = try std.ArrayList([]Tile).initCapacity(self.alloc, self.buffer.len);
+        for (self.buffer) |row| {
+            var list = try std.ArrayList(Tile).initCapacity(self.alloc, row.len);
+            for (row) |cs| {
+                list.appendAssumeCapacity(switch (cs) {
+                    .done => .Hall,
+                    .none => .Wall,
+                    .explore => .Othe,
+                });
+            }
+            cellList.appendAssumeCapacity(try list.toOwnedSlice());
+        }
+        return .{
+            .cells = try cellList.toOwnedSlice(),
+            .alloc = self.alloc,
+        };
+    }
 };
 
 const CellState = enum { done, none, explore };
@@ -206,7 +310,7 @@ pub const Kruskal = struct {
         for (0..width) |x| {
             for (0..height) |y| {
                 const p = xy(x, y);
-                try set.put(p, x + (x * y));
+                try set.put(p, x + (y * width));
                 if (x > 0) {
                     try edgeList.append(.{ xy(x - 1, y), xy(x, y) });
                 }
@@ -217,12 +321,24 @@ pub const Kruskal = struct {
         }
         return .{
             .edges = edgeList,
-            .good_edges = AL([2]Point),
+            .good_edges = AL([2]Point).init(alloc),
             .set = set,
             .alloc = alloc,
             .rng = rng,
             .dimensions = lib.rect(width, height),
         };
+    }
+
+    pub fn gen(
+        width: usize,
+        height: usize,
+        alloc: std.mem.Allocator,
+        rng: std.Random,
+    ) !Maze {
+        var self = try Self.init(width, height, alloc, rng);
+        defer self.deinit();
+        while (try self.next()) |_| {}
+        return try self.to_maze();
     }
 
     pub fn deinit(self: *Self) void {
@@ -231,15 +347,17 @@ pub const Kruskal = struct {
         self.good_edges.deinit();
     }
 
-    pub fn next(self: *Self) ?[2]Point {
+    pub fn next(self: *Self) !?[2]Point {
         const e = while (true) {
             if (self.edges.items.len < 1) return null;
             const i = self.rng.int(usize) % self.edges.items.len;
             const e = self.edges.swapRemove(i);
-            if (self.set.get(e[0]) != self.set.get(e[1])) break e;
+            const p1 = self.set.get(e[0]).?;
+            const p2 = self.set.get(e[1]).?;
+            if (p1 != p2) break e;
         };
 
-        self.good_edges.append(e);
+        try self.good_edges.append(e);
         const a = self.set.get(e[0]).?;
         const b = self.set.get(e[1]).?;
 
@@ -253,93 +371,46 @@ pub const Kruskal = struct {
         return e;
     }
 
-    pub fn to_cells(self: Self) !Maze {
+    pub fn to_maze(self: Self) !Maze {
         const w = self.dimensions.w * 2 - 1;
         const h = self.dimensions.h * 2 - 1;
-        var cells = try AL([]Tile).initCapacity(
+        var cellList = try AL([]Tile).initCapacity(
             self.alloc,
             h,
         );
-        for (0..cells.capacity) |_| {
+        for (0..h) |y| {
             var row = try AL(Tile).initCapacity(
                 self.alloc,
                 w,
             );
 
-            try row.appendNTimes(.Wall, w);
-            try cells.append(try row.toOwnedSlice());
+            for (0..w) |x| {
+                try row.append(if (x | y & 1 == 0) .Hall else .Wall);
+            }
+
+            try cellList.append(try row.toOwnedSlice());
         }
+        var cells = try cellList.toOwnedSlice();
 
         for (self.good_edges.items) |e| {
-            p1 //TODO KEEP GOING WOOHOO
+            const p1 = to_maze_point(e[0]);
+            const p2 = to_maze_point(e[1]);
+            const pm = mid(p1, p2);
+
+            cells[pm.y][pm.x] = .Hall;
         }
+
+        return .{
+            .cells = cells,
+            .alloc = self.alloc,
+        };
     }
 };
 
-
-
-pub const Maze = struct {
-    cells: [][]Tile,
-    alloc: std.mem.Allocator,
-
-    pub fn deinit(self: @This()) void {
-        for (self.cells) |r| {
-            self.alloc.free(r);
-        }
-        self.alloc.free(self.cells);
-    }
-};
-
-pub const Tile = enum {
-    Wall,
-    Hall,
-};
-
-pub fn print(maze: Maze) !void {
-    const stdout = std.io.getStdOut().writer();
-
-    var lines = AL([]u8).init(maze.alloc);
-    defer lines.deinit();
-
-    var hat_len: usize = 0;
-
-    for (maze.cells) |row| {
-        var line = AL(u8).init(maze.alloc);
-
-        hat_len = 0;
-        for (row, 0..) |cell, x| {
-            const repeat = ((x + 1) & 1) + 1;
-            for (0..repeat) |_| {
-                try line.appendSlice(switch (cell) {
-                    .Hall => " ",
-                    .Wall => WALL,
-                });
-                hat_len += 1;
-            }
-        }
-
-        try lines.append(try line.toOwnedSlice());
-    }
-
-    // const line_len = lines.items[0].len;
-
-    for (0..hat_len + 2) |_| {
-        try stdout.print("{s}", .{WALL});
-    }
-    try stdout.print("\n", .{});
-
-    for (lines.items) |row| {
-        try stdout.print("{s}{s}{s}\n", .{ WALL, row, WALL });
-    }
-
-    for (0..hat_len + 2) |_| {
-        try stdout.print("{s}", .{WALL});
-    }
-    try stdout.print("\n", .{});
-
-    for (lines.items) |row| {
-        maze.alloc.free(row);
-    }
+fn to_maze_point(p: Point) Point {
+    const x = if (p.x == 0) 0 else p.x * 2;
+    const y = if (p.y == 0) 0 else p.y * 2;
+    return xy(x, y);
 }
 
 fn is_adjacent(a: Point, b: Point) bool {
